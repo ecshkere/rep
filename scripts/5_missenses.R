@@ -61,6 +61,7 @@ find_missense_tfs <- function(patients, tfs, patients_tf) {
     ungroup() %>%
     select(tf, rsid, chr, pos, ref, alt, patient1, allele1, patient2, allele2) %>%
     mutate(allele1 = translate_gt(allele1, ref, alt),
-           allele2 = translate_gt(allele2, ref, alt))
+           allele2 = translate_gt(allele2, ref, alt)) %>% 
+    mutate(qual = ifelse(substr(allele1, 1, 1) == substr(allele1, 2, 2) & substr(allele2, 1, 1) == substr(allele2, 2, 2), "homo", "hetero"))
   return(result_missenses)
 }

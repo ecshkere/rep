@@ -123,12 +123,10 @@ length(all_degs) # 107
 
 result_missenses <- find_missense_tfs(patients, tfs, comparisons_df)
 homo_missenses <- result_missenses %>%
-  filter(substr(allele1, 1, 1) == substr(allele1, 2, 2) & substr(allele2, 1, 1) == substr(allele2, 2, 2)) %>% 
-  pull(tf) %>% unique() %>% sort()
+  filter(qual == "homo") %>% pull(tf) %>% unique() %>% sort()
 
 hetero_missenses <- result_missenses %>%
-  filter(substr(allele1, 1, 1) != substr(allele1, 2, 2) | substr(allele2, 1, 1) != substr(allele2, 2, 2)) %>% 
-  pull(tf) %>% unique() %>% sort()
+  filter(qual == "hetero") %>% pull(tf) %>% unique() %>% sort()
 
 missense_tfs <- sort(unique(result_missenses$tf))
 length(missense_tfs) # 82
@@ -172,15 +170,16 @@ degs_ss <- sort(unique(deseq_ss$symbol))
 degs_conf <- intersect(degs_ss, degs_in_vitro)
 length(degs_conf) # 51
 
-missense_ss_df <- find_missense_tfs(patients, tfs_to_check, comparisons_ss)
-missense_ss <- sort(unique(missense_ss_df$tf)) # 25
-missense_conf <- intersect(missense_ss, missenses_in_vitro)
-length(missense_conf) # 23
+missense_ss_df <- find_missense_tfs(patients, tfs_to_check, comparisons_ss) %>% 
+  filter(tf %in% missenses_in_vitro)
+missense_conf <- sort(unique(missense_ss_df$tf))
+length(missense_conf) # 41
 
 missense_conf_homo <- missense_ss_df %>%
-  filter(substr(allele1, 1, 1) == substr(allele1, 2, 2) & substr(allele2, 1, 1) == substr(allele2, 2, 2)) %>% 
-  pull(tf) %>% unique() %>% sort() %>%
-  intersect(missense_conf)
+  filter(qual == "homo") %>% pull(tf) %>% unique() %>% sort()
+
+missense_conf_hetero <- missense_ss_df %>%
+  filter(qual == "hetero") %>% pull(tf) %>% unique() %>% sort()
 
 # writeLines(degs_conf, "2025.10.28.degs_confirmed_in_vivo.p01logror01.txt")
 # writeLines(missense_conf, "2025.11.06.missenses_confirmed_in_vivo.p01logror01.txt")
@@ -281,6 +280,8 @@ snp_patients_vv <- joined_df %>% filter(symbol %in% ddmaf_df_filt_ss$symbol) %>%
 degs_freq_vtr <- enframe(sort(table(deseq_df_vtr[deseq_df_vtr$symbol %in% degs_in_vitro,]$symbol), decreasing = T), name = "tf", value = "times")
 mssns_freq_vtr <- enframe(sort(table(result_missenses_vtr %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
                                        filter(tf %in% missenses_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times")
+mssns_freq_vtr <- enframe(sort(table(result_missenses_vtr %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
+                                       filter(tf %in% missenses_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times")
 
 degs_freq_vv <- enframe(sort(table(deseq_ss[deseq_ss$symbol %in% degs_conf,]$symbol), decreasing = T), name = "tf", value = "times")
 mssns_freq_vv <- enframe(sort(table(missense_ss_df %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
@@ -289,7 +290,7 @@ mssns_freq_vv <- enframe(sort(table(missense_ss_df %>% group_by(tf, patient1, pa
 degs_freq <- full_join(degs_freq_vtr, degs_freq_vv, by = "tf", suffix = c("_vtr", "_vv"))
 mssns_freq <- full_join(mssns_freq_vtr, mssns_freq_vv, by = "tf", suffix = c("_vtr", "_vv"))
 
-full_join(degs_freq, mssns_freq, by = "tf", suffix = c("_deg", "_mssns")) %>% 
+ress <- full_join(degs_freq, mssns_freq, by = "tf", suffix = c("_deg", "_mssns")) %>% 
   rowwise() %>%
   mutate(sum = sum(c_across(2:5), na.rm = T)) %>%
   ungroup() %>%
