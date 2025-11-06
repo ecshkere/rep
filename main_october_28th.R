@@ -276,11 +276,19 @@ snp_patients_vv <- joined_df %>% filter(symbol %in% ddmaf_df_filt_ss$symbol) %>%
   group_by(rsid) %>% summarize(present_at = paste0(sort(c(patient)), collapse = "_")) %>%
   distinct()
 
+# how many pairs of people have this TF as differentially expressed
+degs_freq_vtr <- enframe(sort(table(deseq_df_vtr[deseq_df_vtr$symbol %in% degs_in_vitro,]$symbol), decreasing = T), name = "tf", value = "times") %>% 
+  # divide by how many could have had it diff expressed
+  inner_join(enframe(sort(table(comparisons_df_vtr %>% filter(tf %in% degs_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times_all")) %>% 
+  mutate(freq = times / times_all)
 
-degs_freq_vtr <- enframe(sort(table(deseq_df_vtr[deseq_df_vtr$symbol %in% degs_in_vitro,]$symbol), decreasing = T), name = "tf", value = "times")
-mssns_freq_vtr <- enframe(sort(table(result_missenses_vtr %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
-                                       filter(tf %in% missenses_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times")
-mssns_freq_vtr <- enframe(sort(table(result_missenses_vtr %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
+enframe(sort(table(comparisons_ss %>% filter(tf %in% degs_conf) %>% pull(tf)), decreasing = T), name = "tf", value = "times")
+
+# add 1/4 for each comparison if the missense is heterozygous
+# divide if it's non-functional
+mssns_freq_vtr_htr <- enframe(sort(table(result_missenses_vtr %>% filter(qual == "hetero") %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
+                                       filter(tf %in% missenses_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times") %>% mutate(times = times / 4)
+mssns_freq_vtr_hh <- enframe(sort(table(result_missenses_vtr %>% filter(qual == "homo") %>% group_by(tf, patient1, patient2) %>% summarize(.groups = "drop") %>%
                                        filter(tf %in% missenses_in_vitro) %>% pull(tf)), decreasing = T), name = "tf", value = "times")
 
 degs_freq_vv <- enframe(sort(table(deseq_ss[deseq_ss$symbol %in% degs_conf,]$symbol), decreasing = T), name = "tf", value = "times")

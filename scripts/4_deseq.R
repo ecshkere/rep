@@ -7,7 +7,7 @@
 # write.table(counts, "counts/in_vitro_counts.tsv", sep = "\t")
 # write.table(coldata, "counts/in_vitro_coldata.tsv", sep = "\t")
 
-find_tf_degs <- function(counts, coldata, tfs, comparisons_df) {
+find_tf_degs <- function(counts, coldata, tfs, comparisons_df, padj_thr = 0.1, lfc_thr = 0.5) {
   tf_counts <- counts %>%
     mutate(ensembl = rownames(.)) %>%
     inner_join(annotations_clean) %>%
@@ -40,6 +40,6 @@ find_tf_degs <- function(counts, coldata, tfs, comparisons_df) {
   }
   
   tf_deseq_results <- tf_deseq_results %>% 
-    filter(padj < 0.1 & abs(log2FoldChange) > 0.5)
+    filter(padj < padj_thr & abs(log2FoldChange) > lfc_thr)
   return(tf_deseq_results)
 }
