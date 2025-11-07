@@ -126,25 +126,25 @@ symbol_to_entrez <- function(x) {
   }
 }
 
-go <- function(x) {
+go <- function(x, q_v = 0.1) {
   enrichGO(gene = x,
            OrgDb = org.Hs.eg.db,
            keyType = "SYMBOL",
            universe = background_symb,
            ont = "BP",
            pAdjustMethod = "BH",
-           qvalueCutoff = 0.1,
+           qvalueCutoff = q_v,
            readable = TRUE) %>%
     as.data.frame()
 }
 
-kegg <- function(x) {
+kegg <- function(x, q_v = 0.1) {
   if (is.na(as.numeric(x[1]))) { x <- symbol_to_entrez(x) }
   k <- enrichKEGG(gene = x,
                   organism = "hsa",
                   pAdjustMethod = "BH",
                   universe = background_entr,
-                  qvalueCutoff = 0.1) %>% as.data.frame()
+                  qvalueCutoff = q_v) %>% as.data.frame()
   
   if (nrow(k) > 0) {
     entrezes <- strsplit(k$geneID, "/")

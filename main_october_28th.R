@@ -25,10 +25,9 @@ library(tidyverse)
 
 source("scripts/1_functions.R")
 source("scripts/2_snp_stats_27.10.R")
-source("scripts/4_deseq.R")
-source("scripts/5_missenses.R")
+source("scripts/3_deseq.R")
+source("scripts/4_missenses.R")
 
-## in vitro chip-seq snps
 if (!exists("IN_VIVO")) {
   patients <- c("sAn", "sBn", "sDm")
   counts_path <- "counts/in_vitro_counts.tsv"
@@ -39,6 +38,7 @@ if (!exists("IN_VIVO")) {
   coldata_path <- "counts/in_vivo_coldata.tsv"
 }
 
+## in vitro chip-seq snps
 joined_df <- lapply(patients, read_chipseq) %>% bind_rows() %>%
   mutate(variant = paste(chr, pos, ref, alt, sep = '_')) %>%
   group_by(variant) %>% filter(n_distinct(patient) > 1) %>% ungroup() # filtering snps found in at least 2 patients
@@ -47,7 +47,7 @@ joined_df <- lapply(patients, read_chipseq) %>% bind_rows() %>%
 joined_df <- assign_genes(joined_df, "chr", "pos", promoters = TRUE)
 joined_df <- add_rsids(joined_df, "chr", "pos", "ref")
 
-#### in vitro RNA-seq
+## in vitro RNA-seq
 stats_dir <- "data/"
 ase_dfs <- lapply(patients, function(x) {
   read_rnaseq(x, min_DP = 100)
@@ -80,7 +80,7 @@ rsids_in_folder <- gsub("\\.rds", "", result_files)
 rsids_to_process <- setdiff(snps_for_mtfbrkr, rsids_in_folder)
 
 # writeLines(rsids_to_process, "snps_for_mtfbrkr_to_add.txt")
-## Rscript scripts/motifbreakr.R snps_for_mtfbrkr_to_add.txt motifbreakr/ 30 
+## Rscript scripts/motifbreakr.R snps_for_mtfbrkr_to_add.txt motifbreakr/ 30
 
 if (length(rsids_to_process)) {
   run_motifbreakr(rsids_to_process, mtfbrkr_dir, batch_size = 26) 
@@ -141,12 +141,11 @@ if (!exists("IN_VIVO")) {
   degs_in_vitro <- all_degs; missenses_in_vitro <- missense_tfs; result_missenses_vtr <- result_missenses; deseq_df_vtr <- deseq_df
   joined_df_vtr <- joined_df; ase_vtr <- ase; chipseq_df_vtr <- chipseq_df; ddmaf_df_vtr <- ddmaf_df; ddmaf_df_filt_vtr <- ddmaf_df_filt
   snpgenedf_vtr <- snpgenedf; counts_vtr <- counts; coldata_vtr <- coldata; patients_vtr <- patients; comparisons_df_vtr <- comparisons_df
-  IN_VIVO <- TRUE # run again up to all_degs ## сделать нормально
+  IN_VIVO <- TRUE # run again ## сделать нормально
 }
 
 chipseq_subset <- chipseq_df %>% filter(rsid %in% causal_snps$SNP_id)
 ase_subset <- ase %>% filter(symbol %in% chipseq_subset$symbol)
-
 ddmaf_df_ss <- prepare_for_glm(ase_subset, chipseq_subset)
 
 glm_res_ss <- run_glm(select(ddmaf_df_ss, symbol, patients, starts_with("DP"))) %>%
@@ -184,7 +183,7 @@ missense_conf_hetero <- missense_ss_df %>%
 # writeLines(degs_conf, "output/2025.10.28.degs_confirmed_in_vivo.p01logror01.txt")
 # writeLines(missense_conf, "output/2025.11.06.missenses_confirmed_in_vivo.p01logror01.txt")
 
-########## annotating missense snps with uniprot
+## annotating missense snps with uniprot
 uniprot_ids <- read_tsv("output/idmapping_2025_10_28.tsv") %>% 
   filter(Reviewed == "reviewed") %>% 
   select(From, Entry)
@@ -231,7 +230,6 @@ ddase_genes <- ddmaf_df_filt_vtr %>%
   filter(rsid %in% (snpgenedf_vtr %>% filter(tf %in% union(degs_in_vitro, missenses_in_vitro)) %>% pull(SNP_id))) %>%
   pull(symbol) %>% unique() 
 
-# genes having high ddASE and associated through motifbreaking SNPs in their promoters with DE or missense TFs
 ddase_genes_ss <- ddmaf_df_filt_ss %>%
   filter(rsid %in% (snpgenedf %>% filter(tf %in% union(degs_conf, missense_conf)) %>% pull(SNP_id))) %>%
   pull(symbol) %>% unique() 
@@ -247,26 +245,18 @@ write_tsv(go_ddase, "output/2025.10.28.GO_ddASE_genes.tsv")
 # write_tsv(kegg_ddase, "output/2025.10.28.KEGG_ddASE_genes.tsv")
 
 
-
-
-
-
-
-
-
-
 ########## SUPPLEMENTARY TABLE
-
 # choose significant ddase genes having promoter snps motifbreaking differentially expressed or missense tfs
 tableee <- ddmaf_df_filt_vtr %>% select(rsid, symbol, patients, padj, log2ROR) %>%
   inner_join(snpgenedf_vtr, by = c("rsid" = "SNP_id"), relationship = "many-to-many") %>%
   filter(tf %in% union(degs_in_vitro, missenses_in_vitro)) %>%
-  # collect all tfs motifbroken by any snp in the promoter
+  # collect all tfs motifbroken by any snp in the promoter of the gene
   group_by(symbol) %>% mutate(tfs = list(unique(tf))) %>% select(-rsid, -tf) %>% distinct() %>%
-  # calculate mean p-value and log2ROR across all significant comparisons
+  # calculate mean p-value and log2ROR across all comparisons with padj < 0.1
   group_by(symbol, tfs) %>% summarize(padj = mean(padj), log2ROR = mean(log2ROR), .groups = "drop") %>%
   rowwise() %>% mutate(n_tfs = length(tfs), n_degs = length(intersect(tfs, degs_in_vitro)), n_missenses = length(intersect(tfs, missenses_in_vitro)))
 
+# same for in vivo subset
 tableee_ss <- ddmaf_df_filt_ss %>% select(rsid, symbol, patients, padj, log2ROR) %>%
   inner_join(snpgenedf, by = c("rsid" = "SNP_id"), relationship = "many-to-many") %>%
   filter(tf %in% union(degs_conf, missense_conf)) %>%
@@ -281,7 +271,7 @@ degs_freq_vtr <- enframe(table(deseq_df_vtr$symbol), name = "tf", value = "times
   inner_join(enframe(table(comparisons_df_vtr$tf), name = "tf", value = "times_all")) %>% 
   filter(tf %in% degs_in_vitro) %>% mutate(freq_in_vitro = times_deg / times_all) 
 
-# same for in vivo subset
+# in vivo
 degs_freq_vv <- enframe(table(deseq_ss$symbol), name = "tf", value = "times_deg") %>%
   inner_join(enframe(table(comparisons_ss$tf), name = "tf", value = "times_all")) %>% 
   filter(tf %in% degs_conf) %>% mutate(freq_in_vivo = times_deg / times_all)
@@ -294,9 +284,9 @@ mssns_freq_vtr <- result_missenses_vtr %>%
   left_join(distinct(uniprot[, c("rsid", "Domain")]), relationship = "many-to-many") %>%
     # divide by 4 if the missense is heterozygous
     mutate(value = ifelse(qual == "hetero", 0.25, 1)) %>% 
-    # divide again is the mutation is non-functional
+    # divide again is the mutation is non-functional (?)
     mutate(value = ifelse(is.na(Domain) | grepl("REGION|Disordered", Domain), value / 4, value)) %>% 
-    # sum the values for each tf (all rsids and all comparisons) (may be greater than 3)
+    # sum the values for each tf (all rsids and all comparisons (may be greater than 3))
     group_by(tf) %>% summarize(sum_value = sum(value)) %>% 
     # divide by how many comparisons have been made (gene-wise)
     inner_join(enframe(table(comparisons_df_vtr$tf), name = "tf", value = "times_all")) %>% 
@@ -305,22 +295,18 @@ mssns_freq_vtr <- result_missenses_vtr %>%
 mssns_freq_vv  <- missense_ss_df %>%
   filter(tf %in% missense_conf) %>% 
   left_join(distinct(uniprot[, c("rsid", "Domain")]), relationship = "many-to-many") %>%
-  # divide by 4 if the missense is heterozygous
   mutate(value = ifelse(qual == "hetero", 0.25, 1)) %>% 
-  # divide again is the mutation is non-functional
   mutate(value = ifelse(is.na(Domain) | grepl("REGION|Disordered", Domain), value / 4, value)) %>% 
-  # sum the values for each tf (all rsids and all comparisons) (may be greater than 3)
   group_by(tf) %>% summarize(sum_value = sum(value)) %>% 
-  # divide by how many comparisons have been made (gene-wise)
   inner_join(enframe(table(comparisons_ss$tf), name = "tf", value = "times_all")) %>% 
   mutate(freq_in_vivo = sum_value / times_all) %>% arrange(desc(freq_in_vivo))
 
 mssns_tfs_freq_table <- full_join(mssns_freq_vtr, mssns_freq_vv, by = "tf", suffix = c("_vtr", "_vv"))
 
+# degs and missenses in vitro and in vivo
 ress <- full_join(deg_tfs_freq_table[, c("tf", "freq_in_vitro", "freq_in_vivo")],
                   mssns_tfs_freq_table[, c("tf", "freq_in_vitro", "freq_in_vivo")],
-                  by = "tf", suffix = c("_deg", "_mssns")) %>% 
-  rowwise() %>% mutate(sum = sum(c_across(2:5), na.rm = T)) %>% ungroup() %>% arrange(desc(sum))
+                  by = "tf", suffix = c("_deg", "_mssns"))
 
 tablee <- tableee %>% unnest(tfs) %>% rename(tf = tfs) %>%
   left_join(ress[, c("tf", "freq_in_vitro_deg", "freq_in_vitro_mssns")]) %>%
@@ -330,7 +316,7 @@ tablee <- tableee %>% unnest(tfs) %>% rename(tf = tfs) %>%
     freq_in_vitro_deg = sum(freq_in_vitro_deg, na.rm = TRUE),
     freq_in_vitro_mssns = sum(freq_in_vitro_mssns, na.rm = TRUE),
     .groups = "drop") %>%
-  # divide the sum of degs' values by total number of degs (meaning if all of them turned out to be differentially expressed in all possible comparisons)
+  # divide the sum of degs' values by total number of degs (meaning if all of them were differentially expressed in all possible comparisons)
   mutate(deg_freq_vtr_norm = freq_in_vitro_deg / n_degs, mssns_freq_vtr_norm = freq_in_vitro_mssns / n_missenses)
 
 tablee_ss <- tableee_ss %>% unnest(tfs) %>% rename(tf = tfs) %>%
@@ -339,6 +325,7 @@ tablee_ss <- tableee_ss %>% unnest(tfs) %>% rename(tf = tfs) %>%
   summarize(tfs = list(tf), freq_in_vivo_deg = sum(freq_in_vivo_deg, na.rm = TRUE), freq_in_vivo_mssns = sum(freq_in_vivo_mssns, na.rm = TRUE), .groups = "drop") %>% 
   mutate(deg_freq_vv_norm = freq_in_vivo_deg / n_degs, mssns_freq_vv_norm = freq_in_vivo_mssns / n_missenses)
 
+# calculate the total rank based on proportion of degs, missenses, mean p-value and odds-ratio difference
 the_table <- tablee %>% 
   mutate(
     rank_padj = dense_rank(padj),

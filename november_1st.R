@@ -25,10 +25,9 @@ library(tidyverse)
 
 source("scripts/1_functions.R")
 source("scripts/2_snp_stats_31.10.R")
-source("scripts/4_deseq.R")
-source("scripts/5_missenses.R")
+source("scripts/3_deseq.R")
+source("scripts/4_missenses.R")
 
-## in vitro chip-seq snps
 if (!exists("IN_VIVO")) {
   patients <- c("sAn", "sBn", "sDm")
   counts_path <- "counts/in_vitro_counts.tsv"
@@ -39,8 +38,7 @@ if (!exists("IN_VIVO")) {
   coldata_path <- "counts/in_vivo_coldata.tsv"
 }
 
-# joined_df_vv <- joined_df; ase_vv <- ase; chipseq_df_vv <- chipseq_df; ddmaf_df_vv <- ddmaf_df; ddmaf_df_filt_vv <- ddmaf_df_filt; snpgenedf_vv <- snpgenedf; counts_vv <- counts; coldata_vv <- coldata; patients_vv <- patients
-
+## in vitro chip-seq snps
 joined_df <- lapply(patients, read_chipseq) %>% bind_rows() %>%
   mutate(variant = paste(chr, pos, ref, alt, sep = '_')) %>%
   group_by(variant) %>% filter(n_distinct(patient) > 1) %>% ungroup() # filtering snps found in at least 2 patients
@@ -49,7 +47,7 @@ joined_df <- lapply(patients, read_chipseq) %>% bind_rows() %>%
 joined_df <- assign_genes(joined_df, "chr", "pos", promoters = TRUE)
 joined_df <- add_rsids(joined_df, "chr", "pos", "ref")
 
-#### in vitro RNA-seq
+## in vitro RNA-seq
 stats_dir <- "data/"
 ase_dfs <- lapply(patients, function(x) {
   read_rnaseq(x, min_DP = 50)
@@ -166,14 +164,14 @@ length(intersect(missense_tfs, all_degs))
 ## filtering snps found at IN VIVO DIABETICS in promoters of TFs that were differentially expressed or carried missense variants in IN VITRO dataset
 if (!exists("IN_VIVO")) {
   causal_snps <- snpgenedf %>% filter(tf %in% union(all_degs, missense_tfs))
-  degs_in_vitro <- all_degs; missenses_in_vitro <- missense_tfs
-  missense_df_vtr <- result_missenses
-  IN_VIVO <- TRUE # run again up to all_degs ## сделать нормально
+  degs_in_vitro <- all_degs; missenses_in_vitro <- missense_tfs; result_missenses_vtr <- result_missenses; deseq_df_vtr <- deseq_df
+  joined_df_vtr <- joined_df; ase_vtr <- ase; chipseq_df_vtr <- chipseq_df; ddmaf_df_vtr <- ddmaf_df; ddmaf_df_filt_vtr <- ddmaf_df_filt
+  snpgenedf_vtr <- snpgenedf; counts_vtr <- counts; coldata_vtr <- coldata; patients_vtr <- patients; comparisons_df_vtr <- comparisons_df
+  IN_VIVO <- TRUE # run again ## сделать нормально
 }
 
 chipseq_subset <- chipseq_df %>% filter(rsid %in% causal_snps$SNP_id)
 ase_subset <- ase %>% filter(symbol %in% chipseq_subset$symbol)
-
 input_for_glm_ss <- prepare_for_py(ase_subset, chipseq_subset)
 
 subset_for_glm_ss <- input_for_glm_ss %>% select(symbol, patients, contains("DP"), frac_common) %>% 
@@ -187,7 +185,6 @@ if ("n_common" %in% names(subset_for_glm_ss)) {
   swapped_ss <- subset_for_glm_ss %>% filter(frac_common < 0.5)
 }
 
-# Swap patient 2 columns for genes with not enough common SNPs
 for (pref in c("DP_maj_gene", "DP_min_gene")) {
   tmp <- swapped_ss[[paste0(pref, "_0_p2")]]
   swapped_ss[[paste0(pref, "_0_p2")]] <- swapped_ss[[paste0(pref, "_1_p2")]]
