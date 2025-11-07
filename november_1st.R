@@ -161,7 +161,7 @@ length(intersect(missense_tfs, all_degs))
 # writeLines(all_degs, "output/2025.10.31.in_vitro_degs.dp50_padj01_half_common_snps.txt")
 # writeLines(missense_tfs, "output/2025.10.31.in_vitro_missenses.dp50_padj01_half_common_snps.txt")
 
-## filtering snps found at IN VIVO DIABETICS in promoters of TFs that were differentially expressed or carried missense variants in IN VITRO dataset
+## filtering snps found among in vivo diabetics in promoters of TFs that were differentially expressed or carried missense variants in in vitro dataset
 if (!exists("IN_VIVO")) {
   causal_snps <- snpgenedf %>% filter(tf %in% union(all_degs, missense_tfs))
   degs_in_vitro <- all_degs; missenses_in_vitro <- missense_tfs; result_missenses_vtr <- result_missenses; deseq_df_vtr <- deseq_df
